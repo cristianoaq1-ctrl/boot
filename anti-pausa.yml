@@ -1,0 +1,29 @@
+name: Bot Anti-Pausa Supabase
+
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verificar-banco:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Fazer consulta real ao banco de dados
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_URL" && test -n "$SUPABASE_PUBLISHABLE_KEY" || { echo 'Configure os secrets no GitHub.'; exit 1; }
+          resposta=$(curl --fail --silent --show-error --retry 2 --max-time 20 \
+            --get "${SUPABASE_URL%/}/rest/v1/bot_atividade" \
+            --data-urlencode 'select=id' \
+            --data-urlencode 'limit=1' \
+            -H "apikey: ${SUPABASE_PUBLISHABLE_KEY}")
+          echo "$resposta" | grep -Eq '"id"[[:space:]]*:[[:space:]]*1' || { echo 'Resposta inesperada do banco.'; exit 1; }
+          echo 'Consulta ao banco concluida com sucesso.'
